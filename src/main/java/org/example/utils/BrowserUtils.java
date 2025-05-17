@@ -1,12 +1,16 @@
 package org.example.utils;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.RequestOptions;
 
+import java.io.File;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Base64;
+
+import static org.example.config.TestConfig.logger;
 
 /**
  * Utility class for browser interactions using Playwright.
@@ -33,130 +37,6 @@ public class BrowserUtils {
         );
     }
 
-
-    /**
-     * Class to hold the result of a URL navigation.
-     */
-    public static class NavigationResult {
-        private final boolean success;
-        private final String errorMessage;
-        private final Map<String, String> responseHeaders;
-        private final int contentLength;
-        private final byte[] contentSample;
-
-        public NavigationResult(boolean success, String errorMessage) {
-            this(success, errorMessage, null, 0, null);
-        }
-
-        public NavigationResult(boolean success, String errorMessage,
-                                Map<String, String> responseHeaders,
-                                int contentLength,
-                                byte[] contentSample) {
-            this.success = success;
-            this.errorMessage = errorMessage;
-            this.responseHeaders = responseHeaders;
-            this.contentLength = contentLength;
-            this.contentSample = contentSample;
-        }
-
-        public boolean isSuccess() {
-            return success;
-        }
-
-        public String getErrorMessage() {
-            return errorMessage;
-        }
-
-        public Map<String, String> getResponseHeaders() {
-            return responseHeaders;
-        }
-
-        public int getContentLength() {
-            return contentLength;
-        }
-
-        public byte[] getContentSample() {
-            return contentSample;
-        }
-
-        /**
-         * Helper method to get a base64 string representation of the content sample
-         *
-         * @return Base64 encoded content sample or null if no sample is available
-         */
-        public String getContentSampleAsBase64() {
-            return contentSample != null ? Base64.getEncoder().encodeToString(contentSample) : null;
-        }
-    }
-
-
-    /**
-     * Performs a comprehensive validation of a signed URL by examining its content,
-     * headers, and other metadata to ensure it points to the correct object.
-     *
-     * @param url The signed URL to validate
-     * @param expectedContentLength The expected size of the content in bytes, or -1 if unknown
-     * @return A NavigationResult object containing detailed validation results
-     */
-    public NavigationResult validateSignedUrl(String url, int expectedContentLength) {
-        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
-                .setIgnoreHTTPSErrors(true));
-
-        Page page = context.newPage();
-        boolean validationSuccess = false;
-        String errorMessage = null;
-        Map<String, String> headers = new HashMap<>();
-        int contentLength = 0;
-        byte[] contentSample = null;
-
-        try {
-            // Make a GET request to fetch a sample of the content (first 1KB)
-            APIResponse getResponse = page.context().request().fetch(
-                    url,
-                    RequestOptions.create().setMethod("GET").setMaxRedirects(5));
-
-            if (!getResponse.ok()) {
-                errorMessage = "GET request failed: " + getResponse.status() + " " + getResponse.statusText();
-                getResponse.dispose();
-                return new NavigationResult(false, errorMessage);
-            }
-
-            try {
-                contentLength = Integer.parseInt(
-                        getResponse.headers().getOrDefault("content-length", "0")
-                );
-            }catch (NumberFormatException ignored) {
-                // contentLength is already initialize to 0
-            }
-
-            // Get a sample of the content (first 1KB)
-            byte[] fullContent = getResponse.body();
-            int sampleSize = Math.min(1024, fullContent.length);
-            contentSample = Arrays.copyOf(fullContent, sampleSize);
-
-            // Perform validation checks
-            if (expectedContentLength > 0 && contentLength != expectedContentLength) {
-                errorMessage = "Content length mismatch: expected " + expectedContentLength + ", got " + contentLength;
-                getResponse.dispose();
-                return new NavigationResult(false, errorMessage, headers, contentLength, contentSample);
-            }
-
-            // All checks passed
-            validationSuccess = true;
-            getResponse.dispose();
-
-        } catch (TimeoutError te) {
-            errorMessage = "Validation timeout: " + te.getMessage();
-        } catch (Exception e) {
-            errorMessage = "Validation error: " + e.getMessage();
-        } finally {
-            // Clean up resources
-            page.close();
-            context.close();
-        }
-
-        return new NavigationResult(validationSuccess, errorMessage, headers, contentLength, contentSample);
-    }
 
     /**
      * Extracts metadata from a signed URL response to verify object properties.
@@ -192,6 +72,61 @@ public class BrowserUtils {
         }
 
         return metadata;
+    }
+
+    /**
+     * Navigates to a URL and captures a screenshot of the page
+     *
+     * @param url The URL to navigate to
+     * @param fileName Name to use for the screenshot file
+     * @return Path to the saved screenshot file, or null if capture failed
+     */
+    public String capturePageScreenshot(String url, String fileName) {
+        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true));
+        Page page = context.newPage();
+        String screenshotPath = null;
+
+        try {
+            // Create screenshots directory if it doesn't exist
+            File screenshotsDir = new File("screenshots");
+            if (!screenshotsDir.exists()) {
+                screenshotsDir.mkdirs();
+            }
+
+            // Generate the screenshot file path
+            screenshotPath = "screenshots/" + fileName + ".png";
+            File screenshotFile = new File(screenshotPath);
+
+            // Navigate to the URL
+            page.navigate(url, new Page.NavigateOptions().setTimeout(30000));
+
+            // Wait for the page to stabilize
+            page.waitForLoadState(LoadState.NETWORKIDLE);
+
+            // Take screenshot and save it to the file
+            logger.info("Taking screenshot and saving to: " + screenshotPath);
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(Paths.get(screenshotPath))
+            );
+
+            // Verify screenshot was created successfully
+            if (!screenshotFile.exists() || screenshotFile.length() == 0) {
+                logger.severe("Screenshot file was not created or is empty");
+                screenshotPath = null;
+            }
+
+
+        } catch (Exception e) {
+            logger.severe("Error capturing screenshot for URL");
+            throw new RuntimeException("Failed to capture screenshot", e);
+        } finally {
+            // Clean up resources
+            page.close();
+            context.close();
+        }
+
+        return screenshotPath;
     }
 
     /**

@@ -183,4 +183,38 @@ public class BaseTest {
 
         return objectPath;
     }
+
+    /**
+     * Creates a simple SVG image file and uploads it to the test bucket.
+     *
+     * @param objectName Name of the object to create (without the prefix)
+     * @return Path to the created object in the format "gs://bucket-name/object-name"
+     * @throws IOException If there is an error creating or uploading the file
+     * @throws InterruptedException If the process is interrupted
+     */
+    protected String createAndUploadSvgImage(String objectName) throws IOException, InterruptedException {
+        // Create a simple SVG image
+        String svgContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">\n" +
+                "    <rect width=\"100\" height=\"100\" fill=\"blue\" />\n" +
+                "    <circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"red\" />\n" +
+                "</svg>";
+
+        // Write the SVG to a temporary file
+        Path tempFile = Files.createTempFile("test-image-", ".svg");
+        Files.write(tempFile, svgContent.getBytes());
+
+        // Upload the file to GCS
+        String objectPath = "gs://" + testBucketName + "/" + testObjectPrefix + objectName;
+        ProcessUtils.ProcessResult result = gcloudCLI.copyObjects(tempFile.toString(), objectPath);
+
+        // Delete the temporary file
+        Files.delete(tempFile);
+
+        if (!result.isSuccess()) {
+            throw new IOException("Failed to upload SVG image: " + result.getStderr());
+        }
+
+        return objectPath;
+    }
 }

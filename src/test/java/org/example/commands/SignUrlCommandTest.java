@@ -1,12 +1,12 @@
 package org.example.commands;
 
 import org.example.BaseTest;
-import org.example.utils.BrowserUtils;
 import org.example.utils.ProcessUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
  */
 public class SignUrlCommandTest extends BaseTest {
 
-    private String testObjectName;
     private String testObjectPath;
     private int objectSize;
     private static final int DEFAULT_OBJECT_SIZE = 4096; // 4KB for better content validation
@@ -39,53 +38,24 @@ public class SignUrlCommandTest extends BaseTest {
     @BeforeMethod
     public void setUp() throws IOException, InterruptedException {
         // Create a unique test object name for this test
-        testObjectName = "security-" + UUID.randomUUID().toString().substring(0, 8);
+        String testObjectName = "signed-url-" + UUID.randomUUID().toString().substring(0, 8);
 
         // Create a larger test object for better content validation
         objectSize = DEFAULT_OBJECT_SIZE;
         testObjectPath = createTestObject(testObjectName, objectSize);
 
-        logger.info("Created test object for security testing: " + testObjectPath + " (size: " + objectSize + " bytes)");
+        logger.info("Created test object for signed URL testing: " + testObjectPath + " (size: " + objectSize + " bytes)");
     }
 
     /**
-     * Tests that a signed URL returns the expected content size.
-     * This verifies that the content length matches what we uploaded.
-     *
-     * @throws IOException If there is an error executing the command
-     * @throws InterruptedException If the process is interrupted
-     */
-
-    @Test
-    public void testSignedUrlContentSize() throws IOException, InterruptedException {
-        // Generate a signed URL for the test object
-        String signedUrl = generateSignedUrl(testObjectPath);
-        Assert.assertNotNull(signedUrl, "Failed to generate signed URL");
-
-        // Validate the signed URL with expected content size
-        BrowserUtils.NavigationResult result = browserUtils.validateSignedUrl(
-                signedUrl,
-                objectSize  // Expected size
-        );
-
-        // Verify validation succeeded
-        Assert.assertTrue(result.isSuccess(),
-                "Signed URL validation failed: " + result.getErrorMessage());
-
-        // Verify content length matches expected size
-        Assert.assertEquals(result.getContentLength(), objectSize,
-                "Content length does not match expected size");
-    }
-
-    /**
-     * Tests that a signed URL includes appropriate security headers.
+     * Tests that a signed URL includes appropriate headers.
      * This verifies that the response includes headers that help protect against attacks.
      *
      * @throws IOException If there is an error executing the command
      * @throws InterruptedException If the process is interrupted
      */
     @Test
-    public void testSignedUrlSecurityHeaders() throws IOException, InterruptedException {
+    public void testSignedUrlHeaders() throws IOException, InterruptedException {
         // Generate a signed URL for the test object
         String signedUrl = generateSignedUrl(testObjectPath);
         Assert.assertNotNull(signedUrl, "Failed to generate signed URL");
@@ -99,7 +69,7 @@ public class SignUrlCommandTest extends BaseTest {
         // Verify we got metadata
         Assert.assertFalse(metadata.containsKey("error"), "Error occurred while getting metadata from signed URL: " + metadata.get("error"));
 
-        // Check for common security-related headers (at least one should be present)
+        // Check for common headers (at least one should be present)
         boolean hasSecurityHeaders =
                 metadata.containsKey("x-goog-storage-class") ||
                         metadata.containsKey("x-goog-generation") ||
@@ -108,6 +78,51 @@ public class SignUrlCommandTest extends BaseTest {
 
         Assert.assertTrue(hasSecurityHeaders,
                 "Response lacks expected Google Cloud Storage metadata headers");
+
+        int contentLength = 0;
+        try {
+            contentLength = Integer.parseInt(
+                    metadata.getOrDefault("content-length", "-1")
+            );
+        }catch (NumberFormatException ignored) {
+            contentLength = -1;
+        }
+        // Verify content length matches expected size
+        Assert.assertEquals(contentLength, objectSize,
+                "Content length does not match expected size");
+
+    }
+
+    /**
+     * Tests that a signed URL for an image can be accessed and successfully captured as a screenshot.
+     *
+     * @throws IOException If there is an error executing the command or saving the screenshot
+     * @throws InterruptedException If the process is interrupted
+     */
+    @Test
+    public void testSignedUrlImageNavigation() throws IOException, InterruptedException {
+        // Create and upload a simple SVG image
+        String imageObjectName = "test-image-" + UUID.randomUUID().toString().substring(0, 8) + ".svg";
+        String imageObjectPath = createAndUploadSvgImage(imageObjectName);
+
+        logger.info("Created and uploaded SVG image: " + imageObjectPath);
+
+        // Generate a signed URL for the image
+        String signedUrl = generateSignedUrl(imageObjectPath);
+        Assert.assertNotNull(signedUrl, "Failed to generate signed URL");
+
+        // Navigate to the signed URL and capture a screenshot
+        String screenshotPath = browserUtils.capturePageScreenshot(signedUrl, imageObjectName);
+
+        // Verify the screenshot was successfully captured
+        Assert.assertNotNull(screenshotPath, "Screenshot path should not be null");
+
+        // Check if the file exists
+        File screenshotFile = new File(screenshotPath);
+        Assert.assertTrue(screenshotFile.exists(), "Screenshot file does not exist at path: " + screenshotPath);
+
+        // Check if the file has content (not empty)
+        Assert.assertTrue(screenshotFile.length() > 0, "Screenshot file is empty");
     }
 
     /**
