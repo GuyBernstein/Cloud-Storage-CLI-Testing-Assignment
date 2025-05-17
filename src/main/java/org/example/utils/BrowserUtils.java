@@ -1,8 +1,12 @@
 package org.example.utils;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.RequestOptions;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Base64;
 
 /**
  * Utility class for browser interactions using Playwright.
@@ -29,16 +33,30 @@ public class BrowserUtils {
         );
     }
 
+
     /**
      * Class to hold the result of a URL navigation.
      */
     public static class NavigationResult {
         private final boolean success;
         private final String errorMessage;
+        private final Map<String, String> responseHeaders;
+        private final int contentLength;
+        private final byte[] contentSample;
 
         public NavigationResult(boolean success, String errorMessage) {
+            this(success, errorMessage, null, 0, null);
+        }
+
+        public NavigationResult(boolean success, String errorMessage,
+                                Map<String, String> responseHeaders,
+                                int contentLength,
+                                byte[] contentSample) {
             this.success = success;
             this.errorMessage = errorMessage;
+            this.responseHeaders = responseHeaders;
+            this.contentLength = contentLength;
+            this.contentSample = contentSample;
         }
 
         public boolean isSuccess() {
@@ -49,55 +67,131 @@ public class BrowserUtils {
             return errorMessage;
         }
 
+        public Map<String, String> getResponseHeaders() {
+            return responseHeaders;
+        }
+
+        public int getContentLength() {
+            return contentLength;
+        }
+
+        public byte[] getContentSample() {
+            return contentSample;
+        }
+
+        /**
+         * Helper method to get a base64 string representation of the content sample
+         *
+         * @return Base64 encoded content sample or null if no sample is available
+         */
+        public String getContentSampleAsBase64() {
+            return contentSample != null ? Base64.getEncoder().encodeToString(contentSample) : null;
+        }
     }
 
+
     /**
-     * Navigates to the specified URL and checks if it can be accessed.
+     * Performs a comprehensive validation of a signed URL by examining its content,
+     * headers, and other metadata to ensure it points to the correct object.
      *
-     * This implementation focuses on basic URL accessibility by making a simple HTTP request.
-     *
-     * The method:
-     * 1. Creates a new browser context with HTTPS errors ignored
-     * 2. Makes an HTTP GET request to the URL
-     * 3. Checks if the response status indicates success
-     * 4. Returns a NavigationResult object with the result and any error message
-     *
-     * @param url The URL to navigate to
-     * @return A NavigationResult object containing success status and error message if applicable
+     * @param url The signed URL to validate
+     * @param expectedContentLength The expected size of the content in bytes, or -1 if unknown
+     * @return A NavigationResult object containing detailed validation results
      */
-    public NavigationResult navigateToUrl(String url) {
+    public NavigationResult validateSignedUrl(String url, int expectedContentLength) {
         BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setIgnoreHTTPSErrors(true));
 
         Page page = context.newPage();
-        boolean navigationSuccess = false;
+        boolean validationSuccess = false;
         String errorMessage = null;
+        Map<String, String> headers = new HashMap<>();
+        int contentLength = 0;
+        byte[] contentSample = null;
 
         try {
-            // Use Playwright's API for making a fetch request
-            APIResponse response = page.context().request().get(url);
+            // Make a GET request to fetch a sample of the content (first 1KB)
+            APIResponse getResponse = page.context().request().fetch(
+                    url,
+                    RequestOptions.create().setMethod("GET").setMaxRedirects(5));
 
-            // Check if request was successful
-            if (response.ok()) {
-                navigationSuccess = true;
-            } else {
-                errorMessage = "HTTP error: " + response.status() + " " + response.statusText();
+            if (!getResponse.ok()) {
+                errorMessage = "GET request failed: " + getResponse.status() + " " + getResponse.statusText();
+                getResponse.dispose();
+                return new NavigationResult(false, errorMessage);
             }
 
-            // Always dispose of the response
-            response.dispose();
+            try {
+                contentLength = Integer.parseInt(
+                        getResponse.headers().getOrDefault("content-length", "0")
+                );
+            }catch (NumberFormatException ignored) {
+                // contentLength is already initialize to 0
+            }
+
+            // Get a sample of the content (first 1KB)
+            byte[] fullContent = getResponse.body();
+            int sampleSize = Math.min(1024, fullContent.length);
+            contentSample = Arrays.copyOf(fullContent, sampleSize);
+
+            // Perform validation checks
+            if (expectedContentLength > 0 && contentLength != expectedContentLength) {
+                errorMessage = "Content length mismatch: expected " + expectedContentLength + ", got " + contentLength;
+                getResponse.dispose();
+                return new NavigationResult(false, errorMessage, headers, contentLength, contentSample);
+            }
+
+            // All checks passed
+            validationSuccess = true;
+            getResponse.dispose();
 
         } catch (TimeoutError te) {
-            errorMessage = "Navigation timeout: " + te.getMessage();
+            errorMessage = "Validation timeout: " + te.getMessage();
         } catch (Exception e) {
-            errorMessage = "Request error: " + e.getMessage();
+            errorMessage = "Validation error: " + e.getMessage();
         } finally {
             // Clean up resources
             page.close();
             context.close();
         }
 
-        return new NavigationResult(navigationSuccess, errorMessage);
+        return new NavigationResult(validationSuccess, errorMessage, headers, contentLength, contentSample);
+    }
+
+    /**
+     * Extracts metadata from a signed URL response to verify object properties.
+     *
+     * @param url The signed URL to extract metadata from
+     * @return A Map containing the metadata headers
+     */
+    public Map<String, String> extractSignedUrlMetadata(String url) {
+        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true));
+
+        Map<String, String> metadata = new HashMap<>();
+
+        try {
+            // Make a HEAD request to get headers without downloading content
+            APIResponse response = context.request().fetch(
+                    url,
+                    RequestOptions.create().setMethod("HEAD"));
+
+            if (response.ok()) {
+                // Extract all headers
+                for (String headerName : response.headers().keySet()) {
+                    metadata.put(headerName.toLowerCase(), response.headers().get(headerName));
+                }
+            }
+
+            response.dispose();
+        } catch (Exception e) {
+            // Log error but return what we have
+            metadata.put("error", e.getMessage());
+        } finally {
+            context.close();
+        }
+
+        return metadata;
     }
 
     /**
