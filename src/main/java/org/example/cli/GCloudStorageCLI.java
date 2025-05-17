@@ -3,10 +3,7 @@ package org.example.cli;
 import org.example.utils.ProcessUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class GCloudStorageCLI {
     private final ProcessUtils processUtils;
@@ -30,27 +27,47 @@ public class GCloudStorageCLI {
     /**
      * Executes a list command to list objects in a Google Cloud Storage bucket.
      *
-     * @param bucketName Name of the bucket
-     * @param prefix     Optional prefix to filter the results
+     * @param bucketPath Name of the bucket
+     * @param objectName     Optional prefix to filter the results
      * @return The process result containing stdout, stderr, and exit code
      * @throws IOException          If there is an error executing the command
      * @throws InterruptedException If the process is interrupted
      */
 
-    public ProcessUtils.ProcessResult listObjects(String bucketName, String prefix)
+    public ProcessUtils.ProcessResult listObjects(String bucketPath, String objectName)
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(cliPath);
         command.add("storage");
         command.add("ls");
-
-        String bucketPath = "gs://" + bucketName;
-        if (prefix != null && !prefix.isEmpty()) {
-            bucketPath += "/" + prefix + "*";
-        }
-        command.add(bucketPath);
-
+        command.add(Objects.requireNonNullElseGet(objectName, () -> "gs://" + bucketPath + "*"));
         return processUtils.executeCommand(command, environmentVariables, 30);
+    }
+
+    /**
+     * Executes a sign-url command to generate a signed URL for a Google Cloud Storage object.
+     *
+     * @param bucketPath Path to the object
+     * @param duration   Duration for which the signed URL is valid (e.g., "1h" for 1 hour)
+     * @param keyFile    Path to the private key file for signing
+     * @return The process result containing stdout, stderr, and exit code
+     * @throws IOException          If there is an error executing the command
+     * @throws InterruptedException If the process is interrupted
+     */
+
+    public ProcessUtils.ProcessResult signUrl(String bucketPath,
+                                              String duration, String keyFile)
+            throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>();
+        command.add(cliPath);
+        command.add("storage");
+        command.add("sign-url");
+
+        command.add(bucketPath);
+        command.add("--duration=" + duration);
+        command.add("--private-key-file=" + keyFile);
+
+        return processUtils.executeCommand(command, environmentVariables, 60);
     }
 
 

@@ -36,3 +36,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Google Cloud Storage key file ###
+src/test/resources/key.json

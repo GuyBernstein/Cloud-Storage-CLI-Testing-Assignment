@@ -79,9 +79,6 @@ public class BaseTest {
         testBucketName = config.getTestBucketName();
         testObjectPrefix = config.getTestObjectPrefix() + testRunId + "-";
 
-        logger.info("Test bucket: " + testBucketName);
-        logger.info("Test object prefix: " + testObjectPrefix);
-
         // Ensure the test bucket exists (or skip tests if we don't have permissions)
         ensureTestBucketExists();
     }

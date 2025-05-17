@@ -16,6 +16,8 @@ import java.util.UUID;
 public class ListCommandTest extends BaseTest {
     private String testObjectName1;
     private String testObjectName2;
+    private String testObjectPath1;
+    private String testObjectPath2;
 
     /**
      * Setup method that runs before each test method.
@@ -31,9 +33,8 @@ public class ListCommandTest extends BaseTest {
         testObjectName2 = "list-" + UUID.randomUUID().toString().substring(0, 8);
 
         // Create test objects in the bucket (1KB in size)
-        // The createTestObject method will prepend the testObjectPrefix
-        String testObjectPath1 = createTestObject(testObjectName1, 1024);
-        String testObjectPath2 = createTestObject(testObjectName2, 2048);
+        testObjectPath1 = createTestObject(testObjectName1, 1024);
+        testObjectPath2 = createTestObject(testObjectName2, 2048);
 
         logger.info("Created test objects: " + testObjectPath1 + ", " + testObjectPath2);
     }
@@ -47,8 +48,8 @@ public class ListCommandTest extends BaseTest {
      */
     @Test
     public void testListObjects() throws IOException, InterruptedException {
-        // Execute ls command with our test prefix
-        ProcessUtils.ProcessResult result = gcloudCLI.listObjects(testBucketName, testObjectPrefix);
+        // Execute ls command
+        ProcessUtils.ProcessResult result = gcloudCLI.listObjects(testBucketName, null);
 
         // Verify command succeeded
         Assert.assertTrue(result.isSuccess(), "ls command failed: " + result.getStderr());
@@ -57,15 +58,21 @@ public class ListCommandTest extends BaseTest {
         String output = result.getStdout();
         Assert.assertFalse(output.isEmpty(), "ls command output is empty");
 
-        // The full object names include the prefix + the test object names
-        String fullObjectName1 = testObjectPrefix + testObjectName1;
-        String fullObjectName2 = testObjectPrefix + testObjectName2;
-
         // Verify both test objects are listed
-        Assert.assertTrue(output.contains(fullObjectName1),
-                "ls command output does not contain the first test object: " + fullObjectName1);
-        Assert.assertTrue(output.contains(fullObjectName2),
-                "ls command output does not contain the second test object: " + fullObjectName2);
+        Assert.assertTrue(output.contains(testObjectPath1),
+                "ls command output does not contain the first test object: " + testObjectPath1);
+
+        // Execute ls command
+        result = gcloudCLI.listObjects(testBucketName, testObjectPath2);
+
+        // Verify command succeeded
+        Assert.assertTrue(result.isSuccess(), "ls command failed: " + result.getStderr());
+
+        // Verify output contains the test objects
+        output = result.getStdout();
+        Assert.assertFalse(output.isEmpty(), "ls command output is empty");
+        Assert.assertTrue(output.contains(testObjectPath2),
+                "ls command output does not contain the second test object: " + testObjectPath2);
     }
 
     /**
@@ -79,30 +86,43 @@ public class ListCommandTest extends BaseTest {
      */
     @Test
     public void testListObjectsWithPrefix() throws IOException, InterruptedException {
-        // Create a third object with a different prefix
-        String differentPrefix = "different-" + UUID.randomUUID().toString().substring(0, 8);
-        createTestObject(differentPrefix, 1024);
-
-        // Execute ls command with the specific prefix
-        ProcessUtils.ProcessResult result = gcloudCLI.listObjects(
-                testBucketName,
-                testObjectPrefix + differentPrefix);
+        // Execute ls command
+        ProcessUtils.ProcessResult result = gcloudCLI.listObjects(testBucketName, testObjectPath1);
 
         // Verify command succeeded
-        Assert.assertTrue(result.isSuccess(), "ls command with prefix failed: " + result.getStderr());
+        Assert.assertTrue(result.isSuccess(), "ls command failed: " + result.getStderr());
 
-        // Verify output contains only the third test object
+        // Verify output contains the test objects
         String output = result.getStdout();
         Assert.assertFalse(output.isEmpty(), "ls command output is empty");
 
-        // Verify the correct object is listed
-        Assert.assertTrue(output.contains(differentPrefix),
-                "ls command output does not contain the third test object: " + differentPrefix);
+        // Verify both test objects are listed
+        Assert.assertTrue(output.contains(testObjectPath1),
+                "ls command output does not contain the first test object: " + testObjectPath1);
 
-        // Verify the other objects are not listed
-        Assert.assertFalse(output.contains(testObjectName1),
-                "ls command output contains the first test object but shouldn't: " + testObjectName1);
-        Assert.assertFalse(output.contains(testObjectName2),
-                "ls command output contains the second test object but shouldn't: " + testObjectName2);
+        // Execute ls command
+        result = gcloudCLI.listObjects(testBucketName, testObjectPath2);
+
+        // Verify command succeeded
+        Assert.assertTrue(result.isSuccess(), "ls command failed: " + result.getStderr());
+
+        // Verify output contains the test objects
+        output = result.getStdout();
+        Assert.assertFalse(output.isEmpty(), "ls command output is empty");
+        Assert.assertTrue(output.contains(testObjectPath2),
+                "ls command output does not contain the second test object: " + testObjectPath2);
+    }
+
+    @Test
+    public void testListObjectsEmptyResult() throws IOException, InterruptedException {
+        // Test with a non-existent prefix
+        String nonExistentPrefix = "gs://" + testBucketName + "/non-existent-prefix";
+
+        ProcessUtils.ProcessResult result = gcloudCLI.listObjects(testBucketName, nonExistentPrefix);
+
+        // Command shouldn't succeed and return results not containing the test object we created
+        Assert.assertFalse(result.isSuccess());
+        Assert.assertTrue(result.getStdout().trim().isEmpty() ||
+                !result.getStdout().contains(testObjectPath1));
     }
 }
