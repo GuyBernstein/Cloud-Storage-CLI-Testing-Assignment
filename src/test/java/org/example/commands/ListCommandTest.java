@@ -14,8 +14,6 @@ import java.util.UUID;
  * These tests verify that the ls command correctly lists objects in a bucket.
  */
 public class ListCommandTest extends BaseTest {
-    private String testObjectName1;
-    private String testObjectName2;
     private String testObjectPath1;
     private String testObjectPath2;
 
@@ -29,8 +27,8 @@ public class ListCommandTest extends BaseTest {
     @BeforeMethod
     public void setUp() throws IOException, InterruptedException {
         // Create unique test object names for this test (without the prefix)
-        testObjectName1 = "list-" + UUID.randomUUID().toString().substring(0, 8);
-        testObjectName2 = "list-" + UUID.randomUUID().toString().substring(0, 8);
+        String testObjectName1 = "list-" + UUID.randomUUID().toString().substring(0, 8);
+        String testObjectName2 = "list-" + UUID.randomUUID().toString().substring(0, 8);
 
         // Create test objects in the bucket (1KB in size)
         testObjectPath1 = createTestObject(testObjectName1, 1024);
@@ -78,7 +76,7 @@ public class ListCommandTest extends BaseTest {
     /**
      * Tests the ls command with a specific prefix to filter results.
      * Verifies that the command succeeds and only lists objects with the given prefix.
-     *
+     * <p>
      * The key difference between this and the first test,
      * verifies the filtering functionality when a more specific prefix is provided.
      * @throws IOException If there is an error executing the command

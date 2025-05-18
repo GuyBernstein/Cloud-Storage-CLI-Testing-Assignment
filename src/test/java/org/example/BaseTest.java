@@ -12,6 +12,7 @@ import org.testng.annotations.BeforeSuite;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -71,10 +72,9 @@ public class BaseTest {
      * Setup method that runs before each test class.
      * Initializes test-specific resources and data.
      *
-     * @throws IOException If there is an error initializing resources
      */
     @BeforeClass
-    public void classSetup() throws IOException {
+    public void classSetup() {
         // Get test bucket name and object prefix from configuration
         testBucketName = config.getTestBucketName();
         testObjectPrefix = config.getTestObjectPrefix() + testRunId + "-";
@@ -131,10 +131,8 @@ public class BaseTest {
     /**
      * Cleans up test objects created during the test.
      *
-     * @throws IOException          If there is an error during cleanup
-     * @throws InterruptedException If the cleanup process is interrupted
      */
-    private void cleanupTestObjects() throws IOException, InterruptedException {
+    private void cleanupTestObjects() throws InterruptedException {
         try {
             // Delete test objects with our test prefix
             String objectPath = "gs://" + testBucketName + "/" + testObjectPrefix + "*";
@@ -215,6 +213,35 @@ public class BaseTest {
             throw new IOException("Failed to upload SVG image: " + result.getStderr());
         }
 
+        return objectPath;
+    }
+
+    /**
+     * Uploads a phishing content HTML file from the local directory to the test bucket.
+     *
+     * @param objectName Name of the object to create in the bucket
+     * @return Path to the created object in the format "gs://bucket-name/object-name"
+     * @throws IOException If there is an error uploading the file
+     * @throws InterruptedException If the process is interrupted
+     */
+    protected String uploadPhishingContentFile(String objectName) throws IOException, InterruptedException {
+        // Path to the local phishing_content.html file
+        Path localFile = Paths.get("phishing_content.html");
+
+        // Verify the file exists
+        if (!Files.exists(localFile)) {
+            throw new IOException("Phishing content file not found: " + localFile.toAbsolutePath());
+        }
+
+        // Upload the file to GCS
+        String objectPath = "gs://" + testBucketName + "/" + testObjectPrefix + objectName;
+        ProcessUtils.ProcessResult result = gcloudCLI.copyObjects(localFile.toString(), objectPath);
+
+        if (!result.isSuccess()) {
+            throw new IOException("Failed to upload phishing content file: " + result.getStderr());
+        }
+
+        logger.info("Successfully uploaded phishing content to: " + objectPath);
         return objectPath;
     }
 }

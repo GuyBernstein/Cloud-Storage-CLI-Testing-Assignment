@@ -79,7 +79,7 @@ public class SignUrlCommandTest extends BaseTest {
         Assert.assertTrue(hasSecurityHeaders,
                 "Response lacks expected Google Cloud Storage metadata headers");
 
-        int contentLength = 0;
+        int contentLength;
         try {
             contentLength = Integer.parseInt(
                     metadata.getOrDefault("content-length", "-1")
@@ -133,7 +133,7 @@ public class SignUrlCommandTest extends BaseTest {
      * @throws IOException If there is an error executing the command
      * @throws InterruptedException If the process is interrupted
      */
-    private String generateSignedUrl(String objectPath) throws IOException, InterruptedException {
+    public static String generateSignedUrl(String objectPath) throws IOException, InterruptedException {
         ProcessUtils.ProcessResult result = gcloudCLI.signUrl(
                 objectPath,
                 config.getSignedUrlDuration(),

@@ -5,8 +5,8 @@ import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.RequestOptions;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,14 +27,15 @@ public class BrowserUtils {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setHeadless(true)  // Run in headless mode for CI environments
-                .setArgs(Arrays.asList("--disable-web-security",  // Disable CORS and other web security features
-                        "--disable-features=IsolateOrigins,site-per-process", // Disable site isolation
-                        "--allow-running-insecure-content", // Allow loading insecure content
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--ignore-certificate-errors"
-                ))
         );
+    }
+
+    public Browser getBrowser() {
+        return browser;
+    }
+
+    public Playwright getPlaywright() {
+        return playwright;
     }
 
 
@@ -85,14 +86,11 @@ public class BrowserUtils {
         BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setIgnoreHTTPSErrors(true));
         Page page = context.newPage();
-        String screenshotPath = null;
+        String screenshotPath;
 
         try {
             // Create screenshots directory if it doesn't exist
-            File screenshotsDir = new File("screenshots");
-            if (!screenshotsDir.exists()) {
-                screenshotsDir.mkdirs();
-            }
+            Files.createDirectories(Paths.get("screenshots"));
 
             // Generate the screenshot file path
             screenshotPath = "screenshots/" + fileName + ".png";
@@ -128,6 +126,7 @@ public class BrowserUtils {
 
         return screenshotPath;
     }
+
 
     /**
      * Closes the browser and Playwright resources.
