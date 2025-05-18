@@ -215,17 +215,4 @@ public class TestConfig {
         }
     }
 
-    /**
-     * Prints all configuration values to the console.
-     * Useful for debugging.
-     */
-    public void printConfiguration() {
-        System.out.println("=== Test Configuration ===");
-        System.out.println("gcloud.path = " + getGCloudPath());
-        System.out.println("test.bucket.name = " + getTestBucketName());
-        System.out.println("test.object.prefix = " + getTestObjectPrefix());
-        System.out.println("key.file.path = " + getKeyFilePath());
-        System.out.println("signed.url.duration = " + getSignedUrlDuration());
-        System.out.println("========================");
-    }
 }

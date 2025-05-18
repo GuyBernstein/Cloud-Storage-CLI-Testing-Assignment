@@ -40,7 +40,7 @@ public class GCloudStorageCLI {
         command.add(cliPath);
         command.add("storage");
         command.add("ls");
-        command.add(Objects.requireNonNullElseGet(objectName, () -> "gs://" + bucketPath + "*"));
+        command.add(Objects.requireNonNullElseGet(objectName, () -> "gs://" + bucketPath + "/*"));
         return processUtils.executeCommand(command, environmentVariables, 30);
     }
 
@@ -98,21 +98,18 @@ public class GCloudStorageCLI {
      * Executes a delete command to delete objects in Google Cloud Storage.
      *
      * @param path      Path to the object to delete (e.g., "gs://bucket/object")
-     * @param recursive Whether to recursively delete objects
      * @return The process result containing stdout, stderr, and exit code
      * @throws IOException          If there is an error executing the command
      * @throws InterruptedException If the process is interrupted
      */
 
-    public ProcessUtils.ProcessResult deleteObjects(String path, boolean recursive)
+    public ProcessUtils.ProcessResult deleteObjects(String path)
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(cliPath);
         command.add("storage");
         command.add("rm");
-        if (recursive) {
-            command.add("-r");
-        }
+
         command.add(path);
 
         return processUtils.executeCommand(command, environmentVariables, 30);

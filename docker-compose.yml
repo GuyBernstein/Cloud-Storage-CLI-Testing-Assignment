@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  cli-testing:
+    image: cli-testing
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount the entire project directory
+      - .:/app
+      # Mount your Google Cloud credentials from host to container
+      - ~/.config/gcloud:/root/.config/gcloud
+      # Mount just the key file to avoid embedding it in the image
+      - ./src/test/resources/key.json:/src/test/resources/key.json:ro
+      # Make sure the phishing_content.html file is available in the container's working directory
+      - ./phishing_content.html:/app/phishing_content.html:ro
+    environment:
+      - GCLOUD_PATH=gcloud
+      - TEST_BUCKET_NAME=example_bucket1sy
+      - TEST_OBJECT_PREFIX=test-object-
+      - SIGNED_URL_DURATION=1h
+      - KEY_FILE_PATH=/src/test/resources/key.json
+    # To make sure test output is visible
+    tty: true
+    stdin_open: true

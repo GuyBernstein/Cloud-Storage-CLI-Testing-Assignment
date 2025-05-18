@@ -119,12 +119,13 @@ public class BaseTest {
             ProcessUtils.ProcessResult result = gcloudCLI.listObjects(testBucketName, null);
 
             if (!result.isSuccess()) {
+                if(result.getStderr().contains("matched no objects")) {
+                    return; // that's good we searched for objects and found non
+                }
                 logger.warning("Test bucket doesn't exist or we don't have permissions: " + result.getStderr());
-                logger.warning("Tests may fail if the bucket doesn't exist or we don't have permissions");
             }
         } catch (Exception e) {
             logger.warning("Error checking test bucket: " + e.getMessage());
-            logger.warning("Tests may fail if the bucket doesn't exist or we don't have permissions");
         }
     }
 
@@ -138,7 +139,7 @@ public class BaseTest {
             String objectPath = "gs://" + testBucketName + "/" + testObjectPrefix + "*";
             logger.info("Cleaning up test objects: " + objectPath);
 
-            ProcessUtils.ProcessResult result = gcloudCLI.deleteObjects(objectPath, true);
+            ProcessUtils.ProcessResult result = gcloudCLI.deleteObjects(objectPath);
 
             if (!result.isSuccess()) {
                 logger.warning("Failed to clean up test objects: " + result.getStderr());

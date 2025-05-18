@@ -23,7 +23,6 @@ import static org.example.commands.SignUrlCommandTest.generateSignedUrl;
 public class PhishingUrlTest extends BaseTest {
     private String testObjectPath1;
     private String testObjectPath2;
-    private BrowserUtils browser;
     private Page page;
     // the html in the project was from the url that was found in phishtank.com:
     private static final String PHISHING_URL = "https://daftar-gratis.vercel.app/";
@@ -37,10 +36,9 @@ public class PhishingUrlTest extends BaseTest {
      */
     @BeforeMethod
     public void setUpTest() throws IOException, InterruptedException {
-        browser = new BrowserUtils();
 
         // Create a new page
-        page = browser.getBrowser().newPage();
+        page = browserUtils.getBrowser().newPage();
 
         // Log the test setup
         logger.info("Created browser and a page for phishing detection test");
@@ -65,9 +63,6 @@ public class PhishingUrlTest extends BaseTest {
     public void tearDownTest() {
         if (page != null) {
             page.close();
-        }
-        if (browser != null) {
-            browser.close();
         }
         logger.info("Closed browser resources for phishing detection test");
     }
@@ -96,7 +91,7 @@ public class PhishingUrlTest extends BaseTest {
      */
     @Test
     public void testImagePhishingAnalysisWithSignedUrl() {
-        logger.info("Starting phishing analysis test with signed URL");
+        logger.info("Starting non phishing analysis test with signed URL");
 
         try {
             // Generate the signed URL
@@ -118,7 +113,12 @@ public class PhishingUrlTest extends BaseTest {
      * @param isSuspectedPhishing If we suspect it is phishing url
      */
     private void analyzePhishingContent(String url, boolean isSuspectedPhishing) throws IOException, InterruptedException {
-        logger.info("Analyzing content of potentially malicious URL: " + url);
+        if (isSuspectedPhishing) {
+            logger.info("Analyzing content of potentially malicious URL: " + url);
+        }
+        else
+            logger.info("Analyzing content of non potentially malicious URL: " + url);
+
 
         try {
             // Navigate to the URL with a timeout

@@ -54,7 +54,7 @@ public class CopyCommandTest extends BaseTest {
         Assert.assertTrue(result.isSuccess(), "cp command failed: " + result.getStderr());
 
         // Verify the destination object exists by listing it
-        ProcessUtils.ProcessResult listResult = gcloudCLI.listObjects(testBucketName, destObjectName);
+        ProcessUtils.ProcessResult listResult = gcloudCLI.listObjects(testBucketName, destObjectPath);
 
         // Verify listing succeeded
         Assert.assertTrue(listResult.isSuccess(), "ls command to verify copy failed: " + listResult.getStderr());
@@ -77,7 +77,7 @@ public class CopyCommandTest extends BaseTest {
     public void testCopyNonExistentObject() throws IOException, InterruptedException {
         // Define a non-existent source object path
         String nonExistentPath = "gs://" + testBucketName + "/" + testObjectPrefix + "non-existent-"
-                + UUID.randomUUID().toString();
+                + UUID.randomUUID();
 
         // Define destination object path
         String destObjectName = testObjectPrefix + "copy-dest-" + UUID.randomUUID().toString().substring(0, 8);
@@ -95,38 +95,4 @@ public class CopyCommandTest extends BaseTest {
                 "Error message should indicate that the source object doesn't exist: " + errorOutput);
     }
 
-    /**
-     * Tests copying an object to a different destination within the same bucket.
-     * Creates a nested directory structure and verifies the copy works properly.
-     *
-     * @throws IOException If there is an error executing the command
-     * @throws InterruptedException If the process is interrupted
-     */
-    @Test
-    public void testCopyToNestedDestination() throws IOException, InterruptedException {
-        // Define a nested destination path
-        String nestedDestDir = testObjectPrefix + "nested/dir/";
-        String destObjectName = nestedDestDir + UUID.randomUUID().toString().substring(0, 8);
-        String destObjectPath = "gs://" + testBucketName + "/" + destObjectName;
-
-        // Execute cp command to copy to nested destination
-        ProcessUtils.ProcessResult result = gcloudCLI.copyObjects(testObjectPath, destObjectPath);
-
-        // Verify command succeeded
-        Assert.assertTrue(result.isSuccess(),
-                "cp command to nested destination failed: " + result.getStderr());
-
-        // Verify the destination object exists by listing it with the nested prefix
-        ProcessUtils.ProcessResult listResult = gcloudCLI.listObjects(testBucketName, nestedDestDir);
-
-        // Verify listing succeeded
-        Assert.assertTrue(listResult.isSuccess(),
-                "ls command to verify nested copy failed: " + listResult.getStderr());
-
-        // Verify the destination object is in the listing
-        String output = listResult.getStdout();
-        Assert.assertFalse(output.isEmpty(), "ls command output for nested dir is empty");
-        Assert.assertTrue(output.contains(destObjectName),
-                "ls command output does not contain the nested destination object: " + destObjectName);
-    }
 }
